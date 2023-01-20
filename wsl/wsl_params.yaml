@@ -1,0 +1,22 @@
+# Set Parameters
+WSLCommon:
+  Distro: EnterYourDistroName # ⚠️ Name of your linux distro, for example Ubuntu
+  StopWSL: --distribution $Distrib --shutdown
+  StartWSL: --distribution $Distrib /yourfolder/start.sh
+  GetWSLVer: --distribution $Distrib --list --all --verbose
+  GetWSLIP: hostname -I
+
+  # "vEthernet (WSL)" @IP
+  vEthAlias: "vEthernet (WSL)"
+  vEthIP: 172.40.1.10
+  vEthMasq: 255.255.240/20 # 20
+  DisableIPV6:
+    $True # Disable-NetAdapterBinding -InterfaceAlias "vEthernet (WSL)" -ComponentID ms_tcpip6
+    # Get-NetAdapterBinding -ComponentID ms_tcpip6
+
+ProxyV4:
+  # need to forward
+  ShowProxyV4ToV4: netsh interface portproxy show v4tov4
+  DelProxyV4ToV4: netsh int portproxy delete v4tov4 listenaddress=0.0.0.0 listenport=$Port
+  AddProxyV4ToV4: netsh interface portproxy add v4tov4 listenaddress=0.0.0.0 listenport=$Port connectaddress=$script:WSLIP connectport=$Port
+  SetProxyV4ToV4: netsh interface portproxy set v4tov4 listenaddress=0.0.0.0 listenport=$Port connectaddress=$script:WSLIP connectport=$Port
