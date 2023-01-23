@@ -32,7 +32,7 @@ function Change-Source {
     tput setaf 7; echo "----------------------------------------------------------------------------------------------------"
     tput bold; tput setaf 7; echo "                     => Checking OS Parameters.                    "
     tput setaf 7; echo "----------------------------------------------------------------------------------------------------"
-    if [[ osname -eq "ubuntu "]] ; then 
+    if [[ $osname == "ubuntu" ]] ; then 
         echo "deb http://archive.ubuntu.com/ubuntu/ ${oscodename} main restricted
 deb http://archive.ubuntu.com/ubuntu/ ${oscodename}-updates main restricted
 deb http://archive.ubuntu.com/ubuntu/ ${oscodename} universe
@@ -43,7 +43,7 @@ deb http://archive.ubuntu.com/ubuntu/ ${oscodename}-backports main restricted un
 deb http://security.ubuntu.com/ubuntu/ ${oscodename}-security main restricted
 deb http://security.ubuntu.com/ubuntu/ ${oscodename}-security universe
 deb http://security.ubuntu.com/ubuntu/ ${oscodename}-security multiverse"> /etc/apt/sources.list
-    elif [[ osname -eq "debian "]] ; then
+    elif [[ osname == "debian" ]] ; then
         echo "deb http://debian.mirrors.ovh.net/debian/ $version main contrib non-free
 deb-src http://debian.mirrors.ovh.net/debian/ $version main contrib non-free
 deb http://security.debian.org/ $version/updates main contrib non-free
@@ -60,8 +60,18 @@ deb-src http://debian.mirrors.ovh.net/debian/ $version-updates main contrib non-
 }
 
 function setupOkta {
+  echo 'SetUp Okta'
+}
+
+function setUpBackup {
+  sudo -v ; curl https://rclone.org/install.sh | sudo bash
 
 }
+
+function generateRSAKeys {
+  ssh-keygen -b 2048 -t rsa -f /tmp/sshkey -q -N ""
+}
+
 
 # Mise à jours des paquets
 function Install-PaquetsEssentiels {
@@ -72,11 +82,7 @@ function Install-PaquetsEssentiels {
   apt install -y zsh
   apt install -y git
   apt install -y curl
-  if [[ ! $token_okta -eq 0 ]] ; then 
-    apt install -y lastpass-cli
-    curl https://raw.githubusercontent.com/okta/okta-cli/master/cli/src/main/scripts/install.sh | $(echo $SHELL)
-    setupOkta
-  fi
+  apt install -y jq
 }
 
 # Install dev-essential
@@ -93,17 +99,19 @@ function maven-install {
   wget https://www-us.apache.org/dist/maven/maven-3/3.6.3/binaries/apache-maven-${1}-bin.tar.gz -P /tmp
   sudo tar xf /tmp/apache-maven-*.tar.gz -C /opt
   sudo ln -s /opt/apache-maven-3.6.3 /opt/maven
-  export JAVA_HOME=/opt/java
   export M2_HOME=/opt/maven
   export MAVEN_HOME=/opt/maven
   export PATH=${M2_HOME}/bin:${PATH}
 }
-function task-insatll {
+
+function task-install {
     sh -c "$(curl --location https://taskfile.dev/install.sh)" -- -d
 }
 
 function download-ScriptUtils {
   #TODO : download Utils script in /opt
+  mkdir -p /opt/script
+  wget -qO- https://raw.githubusercontent.com/A-N-O-D-E-R/llinuxscript/main/change_java_version > /opt/script/change_java_version
 }
 
 function nvm-install {
@@ -120,6 +128,8 @@ function java-install {
   sudo tar xf /tmp/$filename -C /opt
   sudo ln -s /opt/$filename /opt/jdk-${1}
   sudo ln -s /opt/jdk-${1} /opt/java
+  export JAVA_HOME=/opt/java
+  export PATH=${JAVA_HOME}/bin/java:${PATH}
 }
 
 
@@ -166,9 +176,10 @@ function Install-Zsh {
   done
 }
 
-function Update-db {
-  updatedb
+function UpdateDb {
+  echo updatedb
 }
+
 function Install-TraefikPortainer {
 
 mkdir -p /apps/traefik
@@ -291,6 +302,27 @@ networks:
   docker-compose up -d
 }
 
+function Configure_Lastpass {
+  apt-get --no-install-recommends -yqq install   bash-completion   build-essential   cmake   libcurl4    libcurl4-openssl-dev    libssl-dev    libxml2   libxml2-dev    libssl1.1   pkg-config   ca-certificates   xclip
+  apt install lastpass-cli
+   if [ ! -x "$(command -v tomb)" ]; then
+        tput setaf 5; echo "tomb is not install"
+        tput setaf 5; echo "tomb is a software to secure your passwords locally, useful if you don't want to type your passwords"
+        tput setaf 6; read -p "Do you wat to install tomb ? (y/n)  " install_tomb
+        if [ $install_tomb = "y" ]
+        then
+            tput setaf 6; echo "Installation of tomb .................................. En cours"
+            apt-get install tomb
+            tomb dig -s 10 ~/lpass.tomb
+            tomb forge -k lpass.tomb.key
+            tomb lock  -k lpass.tomb.key lpass.tomb
+            tput setaf 7; echo "Installation of tomb.................................. OK"
+            tput setaf 7; echo "please check the following to understand how to use tomb : https://github.com/dyne/Tomb/blob/master/INSTALL.md#basic-usage"
+            tput setaf 7; echo "To open passwords folder enter the following line : tomb open -k lpass.tomb.key lpass.tomb (will ask for password previously enter)"
+        fi
+    fi
+}
+
 function Change-Password {
   tput setaf 6; echo "root:$password_root" | chpasswd
   tput setaf 7; echo "----------------------------------------------------------------------------------------------------"
@@ -349,30 +381,31 @@ tput setaf 7; echo "------------------------------------------------------------
 tput setaf 7; echo "                                   Install srcipt for Linux                                  "
 tput setaf 7; echo "----------------------------------------------------------------------------------------------------"
 
-tput setaf 6; read -p "Do you need to install a new user ? (y/n)  " create_user
-if [ $create_user = "y" ]
-  then
+tput setaf 6; read -p "Do you need to install a new user (usefull for a webserver) ? (y/n)  " create_user
+if [[ $create_user == "y" ]] ; then
     tput setaf 6; read -p "===>     Enter root password : " password_root
     tput setaf 6; read -p "===>     Enter user name : " name_user
     tput setaf 6; read -p "===>     Enter password for $name_user : " password_user
 fi
+
 echo ""
 
-
 tput setaf 6; read -p "Have you a Okta Token ? (y/n)  " install_Okta
-if [ $install_Okta = "y" ]
-  then
+if [[ $install_Okta == "y" ]] ; then
     tput setaf 6; read -p "===>     Enter your Okta API token, for more information see: https://bit.ly/get-okta-api-token | Okta API token: " token_okta
 fi
+
+echo ""
+tput setaf 6; read -p "o you need to install a monitoring tool ? (y/n)  " install_zabbixAgent
+echo ""
+tput setaf 6; read -p "It is the monitoring server host ? (y/n)  " install_zabbixServer
 echo ""
 
 tput setaf 6; read -p "Install Docker ? (y/n)  " install_docker
-if [ $install_docker = "y" ]
-  then
+if [[ $install_docker == "y" ]] ; then
   echo ""
   tput setaf 6; read -p "Install Traefik & Portainer (usefull for a webserver)  ? (y/n)  " install_traefik
-  if [ $install_traefik = "y" ]
-    then
+  if [[ $install_traefik == "y" ]] ; then
     tput setaf 6; read -p "===>     Enter Domaine name (ex : altar.bio) : " ndd
     tput setaf 6; read -p "===>     Enter mail address for Let's Encrypt : " email
     echo ""
@@ -386,8 +419,10 @@ if [ $install_docker = "y" ]
     done
   fi
 fi
+
 echo ""
 echo ""
+
 tput setaf 7; echo "----------------------------------------------------------------------------------------------------"
 tput setaf 7; echo "                                       Start of the script                                          "
 tput setaf 7; echo "----------------------------------------------------------------------------------------------------"
@@ -417,13 +452,12 @@ tput setaf 7; echo "ZSH Installation............................................
 echo ""
 
 tput setaf 6; echo "Update Database .......................................................... En cours"
-Update-db
+UpdateDb
 tput setaf 7; echo "Update Database .......................................................... OK"
 
 echo ""
 echo ""
-if [ $install_docker = "y" ]
-  then
+if [[ $install_docker == "y" ]] ; then
   tput setaf 6; echo "Docker's Installation ..................................................................... En cours"
   Install-Docker
   tput setaf 7; echo "Docker's Installation..................................................................... OK"
@@ -432,17 +466,51 @@ fi
 echo ""
 echo ""
 
-if [ $install_traefik = "y" ]
-  then
+if [[ $install_traefik == "y" ]] ; then
   tput setaf 6; echo "Traefik & de Portainer Installation .................................................... En cours"
   Install-TraefikPortainer
   tput setaf 7; echo "Traefik & de Portainer Installation .................................................... OK"
 fi
+echo ""
+echo ""
+
+if [[ $install_Okta == "y" ]] ; then 
+    curl https://raw.githubusercontent.com/okta/okta-cli/master/cli/src/main/scripts/install.sh | $(echo $SHELL)
+    setupOkta
+fi
+echo ""
+echo ""
+
+if [[ $install_lastpass == "y" ]] ; then 
+    tput setaf 6; echo "Configuration lastpass .................................. En cours"
+    Configure_Lastpass
+    tput setaf 7; echo "Configuration lastpass.................................. OK"
+  fi
+echo ""
+echo ""
+
+if [[ $install_zabbixAgent == "y" ]] ; then 
+    tput setaf 6; echo "Configuration zabbix agent.................................. En cours"
+    Configure_zabbix
+    tput setaf 7; echo "Configuration zabbix agent.................................. OK"
+fi
+echo ""
+echo ""
+
+if [[ $install_zabbixServer == "y" ]] ; then 
+    # TODO : Install zabbix server and ansible
+    echo "install zabbix"
+fi
+echo ""
+echo ""
+
+if [[ $install_Notion == "y" ]] ; then 
+   echo "install notion"
+fi
 
 echo ""
 echo ""
-if [ $create_user = "y" ]
-  then
+if [[ $create_user == "y" ]] ; then
   tput setaf 6; echo "User Creation and password Update .................................. En cours"
   Change-Password
   tput setaf 7; echo "User Creation and password Update.................................. OK"
@@ -450,8 +518,7 @@ fi
 
 echo ""
 echo ""
-if [ $change_sshport = "y" ]
-  then
+if [[ $change_sshport == "y" ]] ; then
   tput setaf 6; echo "Changing SSH port .................................................................... En cours"
   Change-SSHPort
   tput setaf 7; echo "Changing SSH port .................................................................... OK"
@@ -459,8 +526,7 @@ fi
 
 echo ""
 echo ""
-if [ $change_motd = "y" ]
-  then
+if [[ $change_motd == "y" ]] ; then
   tput setaf 6; echo "Changing MOTD....................................................................... En cours"
   Change-MOTD
   tput setaf 7; echo "Changing MOTD....................................................................... OK"
@@ -468,8 +534,7 @@ fi
 
 echo ""
 echo ""
-if [ $install_traefik = "y" ]
-  then
+if [[ $install_traefik == "y" ]] ; then
   echo ""
   echo ""
   tput bold; tput setaf 7; echo "LIVE CONTAINERS LIST : "
@@ -487,16 +552,14 @@ echo ""
 tput setaf 7; echo "----------------------------------------------------------------------------------------------------"
 tput bold; tput setaf 7; echo "                               => CONFIGURATION FINISH <=                                "
 tput setaf 7; echo ""
-if [ $install_traefik = "y" ]
-  then
+if [[ $install_traefik == "y" ]] ; then
   tput bold; tput setaf 7; echo "                               Portainer.$ndd                                            "
   tput bold; tput setaf 7; echo "                               Traefik.$ndd                                            "
   tput bold; tput setaf 7; echo "                           Traefik Identifiant: admin / admin                          "
   tput setaf 7; echo ""
 fi
 tput bold; tput setaf 7; echo "                                RECONNECTION NEEDED                                "
-if [ $change_sshport = "y" ]
-  then
+if [[ $change_sshport == "y" ]] ; then
   tput bold; tput setaf 7; echo "                             Votre nouveau port SSH : $ssh_port                        "
 fi
 tput setaf 7; echo ""

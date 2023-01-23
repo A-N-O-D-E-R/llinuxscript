@@ -4,7 +4,7 @@ version=$(/usr/local/java/bin/java -version 2>&1 | awk -F '"' '/version/ {print 
 if [[ $INPUT == 8 || $INPUT == 11 ]] ; then
 	echo "Changing Java Version from ${version} to ${INPUT}"
 	rm /usr/local/java
-	ln -s /usr/local/lib/jdk-$1/  /usr/local/java
+	ln -s /opt/jdk-$1*  /usr/local/java
 else
 	echo "Unable to change to Java ${INPUT}"
 fi
