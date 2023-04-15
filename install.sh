@@ -89,16 +89,16 @@ function Install-PaquetsEssentiels {
 function Install-DevEssential {
   task-install
   nvm-install 0.39.3
-  java-install 11.0.2
+  java-install "11+28"
   maven-install
   mkcert-install 
   download-ScriptUtils
 }
 
 function maven-install {
-  wget https://www-us.apache.org/dist/maven/maven-3/3.6.3/binaries/apache-maven-${1}-bin.tar.gz -P /tmp
+  wget https://www-us.apache.org/dist/maven/maven-3/${1}/binaries/apache-maven-${1}-bin.tar.gz -P /tmp
   sudo tar xf /tmp/apache-maven-*.tar.gz -C /opt
-  sudo ln -s /opt/apache-maven-3.6.3 /opt/maven
+  sudo ln -s /opt/apache-maven-${1} /opt/maven
   export M2_HOME=/opt/maven
   export MAVEN_HOME=/opt/maven
   export PATH=${M2_HOME}/bin:${PATH}
@@ -122,8 +122,9 @@ function nvm-install {
 
 function java-install {
   filename="openjdk-${1}_linux-x64_bin.tar.gz"
-  wget "https://download.java.net/java/GA/jdk11/9/GPL/${filename}" -P /tmp
-  wget "https://download.java.net/java/GA/jdk11/9/GPL/${filename}.sha256" -P /tmp
+  major=$(echo ${1} |  awk -F '+' '{print $1}')
+  wget "https://download.java.net/openjdk/jdk${major}/ri/${filename}" -P /tmp
+  wget "https://download.java.net/openjdk/jdk${major}/ri/${filename}.sha256" -P /tmp
   printf '%s %s\n' "$(cat /tmp/${filename}.sha256)" "${filename}" | sha256sum --check
   sudo tar xf /tmp/$filename -C /opt
   sudo ln -s /opt/$filename /opt/jdk-${1}
