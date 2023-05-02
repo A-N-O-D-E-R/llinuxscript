@@ -8,19 +8,16 @@
 
 function Verif-System {
   user=$(whoami)
-
   if [ $(whoami) != "root" ]
     then
     tput setaf 5; echo "ERREUR : Veuillez exécuter le script en tant que Root !"
     exit
   fi
-
   if [[ $(arch) != *"64" ]]
     then
     tput setaf 5; echo "ERREUR : Veuillez installer une version x64 !"
     exit
   fi
-
 }
 
 function Change-Source {
@@ -59,8 +56,8 @@ deb-src http://debian.mirrors.ovh.net/debian/ $version-updates main contrib non-
     fi
 }
 
-function setupOkta {
-  echo 'SetUp Okta'
+function setupOAuth {
+  echo 'SetUp OAuth'
 }
 
 function setUpBackup {
@@ -83,11 +80,12 @@ function Install-PaquetsEssentiels {
   apt install -y git
   apt install -y curl
   apt install -y jq
-}
+}œ
 
 # Install dev-essential
 function Install-DevEssential {
   task-install
+  gum-Install
   nvm-install 0.39.3
   java-install "11+28"
   maven-install
@@ -104,6 +102,13 @@ function maven-install {
   export PATH=${M2_HOME}/bin:${PATH}
 }
 
+function gum-install {
+    sudo mkdir -p /etc/apt/keyrings
+    curl -fsSL https://repo.charm.sh/apt/gpg.key | sudo gpg --dearmor -o /etc/apt/keyrings/charm.gpg
+    echo "deb [signed-by=/etc/apt/keyrings/charm.gpg] https://repo.charm.sh/apt/ * *" | sudo tee /etc/apt/sources.list.d/charm.list
+    apt update && apt install gum
+}
+
 function task-install {
     sh -c "$(curl --location https://taskfile.dev/install.sh)" -- -d
 }
@@ -111,7 +116,8 @@ function task-install {
 function download-ScriptUtils {
   #TODO : download Utils script in /opt
   mkdir -p /opt/script
-  wget -qO- https://raw.githubusercontent.com/A-N-O-D-E-R/llinuxscript/main/change_java_version > /opt/script/change_java_version
+  wget -qO- https://raw.githubusercontent.com/A-N-O-D-E-R/llinuxscript/main//utility/change_java_version > /opt/script/change_java_version
+  wget -qO- https://raw.githubusercontent.com/A-N-O-D-E-R/llinuxscript/main//utility/compress.sh > /opt/script/compress.sh
 }
 
 function nvm-install {
@@ -142,7 +148,8 @@ alias gwip='git add -A; git rm $(git ls-files --deleted) 2> /dev/null; git commi
 alias gunwip='git log -n 1 | grep -q -c \"\-\-wip\-\-\" && git reset HEAD~1'
 alias gsts='git stash -- $(git diff --staged --name-only)'
 alias gpsh='git push origin HEAD'
-alias gpshf='git push -f origin HEAD'" > ~/.bash_aliases
+alias gpshf='git push -f origin HEAD'
+" > ~/.bash_aliases
     fi
 }
 
@@ -183,124 +190,124 @@ function UpdateDb {
 
 function Install-TraefikPortainer {
 
-mkdir -p /apps/traefik
-mkdir -p /apps/portainer
+  mkdir -p /apps/traefik
+  mkdir -p /apps/portainer
 
-touch /apps/traefik/traefik.yml
-echo "api:
-  dashboard: true
-entryPoints:
-  http:
-    address: \":80\"
-  https:
-    address: \":443\"
-providers:
-  docker:
-    endpoint: \"unix:///var/run/docker.sock\"
-    exposedByDefault: false
-certificatesResolvers:
-  http:
-    acme:
-      email: $email
-      storage: acme.json
-      httpChallenge:
-        entryPoint: http
-providers.file:
-    filename: \"/etc/traefik/dynamic_conf.toml\"
-    watch: true
-" > /apps/traefik/traefik.yml
+  touch /apps/traefik/traefik.yml
+  echo "api:
+    dashboard: true
+  entryPoints:
+    http:
+      address: \":80\"
+    https:
+      address: \":443\"
+  providers:
+    docker:
+      endpoint: \"unix:///var/run/docker.sock\"
+      exposedByDefault: false
+  certificatesResolvers:
+    http:
+      acme:
+        email: $email
+        storage: acme.json
+        httpChallenge:
+          entryPoint: http
+  providers.file:
+      filename: \"/etc/traefik/dynamic_conf.toml\"
+      watch: true
+  " > /apps/traefik/traefik.yml
 
-touch /apps/traefik/config.yml
-echo "http:
-  middlewares:
-    https-redirect:
-      redirectScheme:
-        scheme: https
-    default-headers:
-      headers:
-        frameDeny: true
-        sslRedirect: true
-        browserXssFilter: true
-        contentTypeNosniff: true
-        forceSTSHeader: true
-        stsIncludeSubdomains: true
-        stsPreload: true
-    secured:
-      chain:
-        middlewares:
-        - default-headers
-  " > /apps/traefik/config.yml
+  touch /apps/traefik/config.yml
+  echo "http:
+    middlewares:
+      https-redirect:
+        redirectScheme:
+          scheme: https
+      default-headers:
+        headers:
+          frameDeny: true
+          sslRedirect: true
+          browserXssFilter: true
+          contentTypeNosniff: true
+          forceSTSHeader: true
+          stsIncludeSubdomains: true
+          stsPreload: true
+      secured:
+        chain:
+          middlewares:
+          - default-headers
+    " > /apps/traefik/config.yml
 
-  touch /apps/traefik/acme.json
-  chmod 600 /apps/traefik/acme.json
+    touch /apps/traefik/acme.json
+    chmod 600 /apps/traefik/acme.json
 
-  touch docker-compose.yml
-  echo "version: '2'
-services:
-  traefik:
-    image: traefik:latest
-    container_name: traefik
-    restart: unless-stopped
-    security_opt:
-      - no-new-privileges:true
-    networks:
-      - proxy
-    ports:
-      - 80:80
-      - 443:443
-    volumes:
-      - /etc/localtime:/etc/localtime:ro
-      - /var/run/docker.sock:/var/run/docker.sock:ro
-      - /apps/traefik/traefik.yml:/traefik.yml:ro
-      - /apps/traefik/acme.json:/acme.json
-      - /apps/traefik/config.yml:/config.yml:ro
-    labels:
-      - traefik.enable=true
-      - traefik.http.routers.traefik.entrypoints=http
-      - traefik.http.routers.traefik.rule=Host(\"traefik.$ndd\")
-      - traefik.http.middlewares.traefik-auth.basicauth.users=admin:{SHA}0DPiKuNIrrVmD8IUCuw1hQxNqZc=
-      - traefik.http.middlewares.traefik-https-redirect.redirectscheme.scheme=https
-      - traefik.http.routers.traefik.middlewares=traefik-https-redirect
-      - traefik.http.routers.traefik-secure.entrypoints=https
-      - traefik.http.routers.traefik-secure.rule=Host(\"traefik.$ndd\")
-      - traefik.http.routers.traefik-secure.middlewares=traefik-auth
-      - traefik.http.routers.traefik-secure.tls=true
-      - traefik.http.routers.traefik-secure.tls.certresolver=http
-      - traefik.http.routers.traefik-secure.service=api@internal
-  portainer:
-    image: portainer/portainer-ce:latest
-    container_name: portainer
-    restart: unless-stopped
-    security_opt:
-      - no-new-privileges:true
-    environment:
-      TEMPLATES: https://github.com/PAPAMICA/docker-compose-collection/blob/master/templates-portainer.json
-    networks:
-      - proxy
-    volumes:
-      - /etc/localtime:/etc/localtime:ro
-      - /var/run/docker.sock:/var/run/docker.sock:ro
-      - /apps/portainer/data:/data
-    labels:
-      - traefik.enable=true
-      - traefik.http.routers.portainer.entrypoints=http
-      - traefik.http.routers.portainer.rule=Host(\"portainer.$ndd\")
-      - traefik.http.middlewares.portainer-https-redirect.redirectscheme.scheme=https
-      - traefik.http.routers.portainer.middlewares=portainer-https-redirect
-      - traefik.http.routers.portainer-secure.entrypoints=https
-      - traefik.http.routers.portainer-secure.rule=Host(\"portainer.$ndd\")
-      - traefik.http.routers.portainer-secure.tls=true
-      - traefik.http.routers.portainer-secure.tls.certresolver=http
-      - traefik.http.routers.portainer-secure.service=portainer
-      - traefik.http.services.portainer.loadbalancer.server.port=9000
-      - traefik.docker.network=proxy
-networks:
-  proxy:
-    external: true
-  " > docker-compose.yml
+    touch docker-compose.yml
+    echo "version: '2'
+  services:
+    traefik:
+      image: traefik:latest
+      container_name: traefik
+      restart: unless-stopped
+      security_opt:
+        - no-new-privileges:true
+      networks:
+        - proxy
+      ports:
+        - 80:80
+        - 443:443
+      volumes:
+        - /etc/localtime:/etc/localtime:ro
+        - /var/run/docker.sock:/var/run/docker.sock:ro
+        - /apps/traefik/traefik.yml:/traefik.yml:ro
+        - /apps/traefik/acme.json:/acme.json
+        - /apps/traefik/config.yml:/config.yml:ro
+      labels:
+        - traefik.enable=true
+        - traefik.http.routers.traefik.entrypoints=http
+        - traefik.http.routers.traefik.rule=Host(\"traefik.$ndd\")
+        - traefik.http.middlewares.traefik-auth.basicauth.users=admin:{SHA}0DPiKuNIrrVmD8IUCuw1hQxNqZc=
+        - traefik.http.middlewares.traefik-https-redirect.redirectscheme.scheme=https
+        - traefik.http.routers.traefik.middlewares=traefik-https-redirect
+        - traefik.http.routers.traefik-secure.entrypoints=https
+        - traefik.http.routers.traefik-secure.rule=Host(\"traefik.$ndd\")
+        - traefik.http.routers.traefik-secure.middlewares=traefik-auth
+        - traefik.http.routers.traefik-secure.tls=true
+        - traefik.http.routers.traefik-secure.tls.certresolver=http
+        - traefik.http.routers.traefik-secure.service=api@internal
+    portainer:
+      image: portainer/portainer-ce:latest
+      container_name: portainer
+      restart: unless-stopped
+      security_opt:
+        - no-new-privileges:true
+      environment:
+        TEMPLATES: https://github.com/PAPAMICA/docker-compose-collection/blob/master/templates-portainer.json
+      networks:
+        - proxy
+      volumes:
+        - /etc/localtime:/etc/localtime:ro
+        - /var/run/docker.sock:/var/run/docker.sock:ro
+        - /apps/portainer/data:/data
+      labels:
+        - traefik.enable=true
+        - traefik.http.routers.portainer.entrypoints=http
+        - traefik.http.routers.portainer.rule=Host(\"portainer.$ndd\")
+        - traefik.http.middlewares.portainer-https-redirect.redirectscheme.scheme=https
+        - traefik.http.routers.portainer.middlewares=portainer-https-redirect
+        - traefik.http.routers.portainer-secure.entrypoints=https
+        - traefik.http.routers.portainer-secure.rule=Host(\"portainer.$ndd\")
+        - traefik.http.routers.portainer-secure.tls=true
+        - traefik.http.routers.portainer-secure.tls.certresolver=http
+        - traefik.http.routers.portainer-secure.service=portainer
+        - traefik.http.services.portainer.loadbalancer.server.port=9000
+        - traefik.docker.network=proxy
+  networks:
+    proxy:
+      external: true
+    " > docker-compose.yml
 
-  tput setaf 2; docker network create proxy
-  docker-compose up -d
+    tput setaf 2; docker network create proxy
+    docker-compose up -d
 }
 
 function Configure_Lastpass {
